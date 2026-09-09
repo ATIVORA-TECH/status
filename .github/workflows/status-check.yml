@@ -1,0 +1,88 @@
+name: Status Check
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verificar servicos
+        id: check
+        run: |
+          check_simple() {
+            local name="$1"
+            local url="$2"
+            local status
+            status=$(curl -s -o /dev/null -m 10 -w "%{http_code}" "$url" 2>/dev/null || echo "000")
+            if [ "$status" = "200" ]; then
+              echo "${name}_status=operacional" >> "$GITHUB_OUTPUT"
+            else
+              echo "${name}_status=fora_do_ar" >> "$GITHUB_OUTPUT"
+            fi
+          }
+
+          check_simple "site" "https://ativora.tech/"
+          check_simple "login" "https://ativora.tech/login"
+          check_simple "api" "https://ativora.tech/health"
+
+          NOW=$(date -u +"%d/%m/%Y %H:%M UTC")
+          echo "timestamp=$NOW" >> "$GITHUB_OUTPUT"
+
+      - name: Gerar README
+        run: |
+          icon() {
+            if [ "$1" = "operacional" ]; then echo "🟢"; else echo "🔴"; fi
+          }
+
+          cat > README.md << EOF
+          # ATIVORA — Status dos Serviços
+
+          > Última verificação: ${TIMESTAMP}
+
+          | Serviço | Status |
+          |---------|--------|
+          | $(icon ${SITE_STATUS}) Plataforma | ${SITE_STATUS} |
+          | $(icon ${LOGIN_STATUS}) Login | ${LOGIN_STATUS} |
+          | $(icon ${API_STATUS}) API | ${API_STATUS} |
+
+          ---
+
+          ## Histórico de Incidentes
+
+          Nenhum incidente registrado.
+
+          ---
+
+          ## Como reportar um problema
+
+          Abra uma [issue](https://github.com/ATIVORA-TECH/status/issues) descrevendo o problema.
+
+          ---
+
+          **ATIVORA TECH** — Inteligência que atende. Automação que vende.
+          EOF
+        env:
+          TIMESTAMP: ${{ steps.check.outputs.timestamp }}
+          SITE_STATUS: ${{ steps.check.outputs.site_status }}
+          LOGIN_STATUS: ${{ steps.check.outputs.login_status }}
+          API_STATUS: ${{ steps.check.outputs.api_status }}
+
+      - name: Commit e push
+        run: |
+          git config user.name "ATIVORA"
+          git config user.email "dev@ativora.tech"
+          git add README.md
+          if git diff --cached --quiet; then
+            echo "Sem mudancas"
+          else
+            git commit -m "status: atualizacao automatica $(date -u +%H:%M)"
+            git push
+          fi
