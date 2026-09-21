@@ -1,6 +1,6 @@
 # ATIVORA — Status dos Serviços
 
-> Última verificação: 20/09/2026 23:48 UTC
+> Última verificação: 21/09/2026 01:44 UTC
 
 | Serviço | Status |
 |---------|--------|
